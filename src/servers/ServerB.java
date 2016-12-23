@@ -7,6 +7,8 @@ import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 
 import registries.LocateGlobalRegistry;
+import services.BankAccount;
+import services.IBankAccount;
 import services.SimpleSorterA;
 import services.SimpleSorterB;
 import services.Sorter;
@@ -26,6 +28,8 @@ public class ServerB {
   //
   private static final String SERVICE_NAME1 = "SimpleSorterA_ServerB";
   private static final String SERVICE_NAME2 = "SimpleSorterB_ServerB";
+  private static final String SERVICE_NAME3 = "BankAccountA_ServerB";
+
 
   //
   // MAIN
@@ -36,19 +40,29 @@ public class ServerB {
     System.out.println("ServerB : running on host " + InetAddress.getLocalHost());
     System.out.println("ServerB : hostname property " + System.getProperty("java.rmi.server.hostname"));
 
-    // instanciate the remote object
-    Sorter sorterA = new SimpleSorterA();
-    Sorter sorterB = new SimpleSorterB();
+//    // instanciate the remote object
+//    Sorter sorterA = new SimpleSorterA(SERVICE_NAME1);
+//    Sorter sorterB = new SimpleSorterB(SERVICE_NAME2);
+//    System.out.println("ServerB: instanciated SimpleSorter");
+//
+//    // create a skeleton and a stub for that remote object
+//    Sorter stubA = (Sorter) UnicastRemoteObject.exportObject(sorterA, 0);
+//    Sorter stubB = (Sorter) UnicastRemoteObject.exportObject(sorterB, 0);
+//    System.out.println("ServerB: generated skeleton and stub");
+//
+//    // register the remote object's stub in the registry
+//	LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME1, stubA);
+//    LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME2, stubB);
+    
+    IBankAccount bankA = new BankAccount(SERVICE_NAME3);
     System.out.println("ServerB: instanciated SimpleSorter");
 
     // create a skeleton and a stub for that remote object
-    Sorter stubA = (Sorter) UnicastRemoteObject.exportObject(sorterA, 0);
-    Sorter stubB = (Sorter) UnicastRemoteObject.exportObject(sorterB, 0);
+    IBankAccount bankStub = (IBankAccount) UnicastRemoteObject.exportObject(bankA, 0);
     System.out.println("ServerB: generated skeleton and stub");
 
     // register the remote object's stub in the registry
-	LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME1, stubA);
-    LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME2, stubB);
+	LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME3, bankStub); 
 
     //listService();
     

@@ -1,6 +1,6 @@
 package services;
 
-import java.rmi.Remote;
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.util.List;
 
@@ -15,11 +15,14 @@ import java.util.List;
  * </ul>
  *
  */
-public interface Sorter extends Remote {
+public interface Sorter extends Service {
 
-  public List<String> sort(List<String> list) throws RemoteException;
+  public List<String> sort(List<String> list) throws RemoteException, NotBoundException;
 
-  public List<String> reverseSort(List<String> list) throws RemoteException;
+  public List<String> reverseSort(List<String> list) throws RemoteException, NotBoundException;
+  
+  public List<String> sortFromBestService(List<String> list) throws RemoteException;
+  
+  public List<String> reverseSortFromBestService(List<String> list) throws RemoteException;
 
-  public double getCPULoad() throws RemoteException;
 }

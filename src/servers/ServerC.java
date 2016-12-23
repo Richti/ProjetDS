@@ -2,6 +2,7 @@ package servers;
 
 import java.net.InetAddress;
 import java.rmi.AccessException;
+import java.rmi.AlreadyBoundException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -37,8 +38,8 @@ public class ServerC {
     System.out.println("ServerC: hostname property " + System.getProperty("java.rmi.server.hostname"));
 
     // instanciate the remote object
-    Sorter sorterA = new SimpleSorterA();
-    Sorter sorterB = new SimpleSorterB();
+    Sorter sorterA = new SimpleSorterA(SERVICE_NAME1);
+    Sorter sorterB = new SimpleSorterB(SERVICE_NAME2);
     System.out.println("ServerC: instanciated SimpleSorter");
 
     // create a skeleton and a stub for that remote object
@@ -52,22 +53,22 @@ public class ServerC {
 //  System.out.println("ServerC: registered remote object's stub");
     
     listService();
-
+    testGlobalRegistry(stubA);
     // main terminates here, but the JVM still runs because of the skeleton
     System.out.println("ServerC: ready");
 
   }
   
-//  private static void testGlobalRegistry(Sorter stub) throws AccessException, RemoteException, AlreadyBoundException, NotBoundException{
-//	// unbind Test
-//	LocateGlobalRegistry.getLocateGlobalRegistry().unbind(SERVICE_NAME);
-//	System.out.println("ServerC: unbin done");
-//	
-//	// bind it
-//	LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME, stub);
-//	System.out.println("ServerC: bind done");
-//
-//  }
+  private static void testGlobalRegistry(Sorter stub) throws AccessException, RemoteException, AlreadyBoundException, NotBoundException{
+	// unbind Test
+	LocateGlobalRegistry.getLocateGlobalRegistry().unbind(SERVICE_NAME1);
+	System.out.println("ServerC: unbin done");
+	
+	// bind it
+	LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME1, stub);
+	System.out.println("ServerC: bind done");
+
+  }
   
   public static void listService() throws AccessException, RemoteException, NotBoundException{
 		String[] services = LocateGlobalRegistry.getLocateGlobalRegistry().list();
