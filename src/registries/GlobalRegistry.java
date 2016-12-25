@@ -22,6 +22,7 @@ public class GlobalRegistry implements IGlobalRegistry {
 	
 	private static final int REGISTRY_PORT = 1099;
 	private LoadBalancingType loadBalancingType;
+	private ReplicationType replicationType;
 	private Map<String, Map<String, Remote>> services = new HashMap<>();
 	
 	// Used in passive and semi-active replication
@@ -33,8 +34,9 @@ public class GlobalRegistry implements IGlobalRegistry {
 	//Use to perform RoundRobin load balancing
 	private Map<String, Integer> currentServiceIndex = new HashMap<>();
 	  
-	public GlobalRegistry(LoadBalancingType loadBalancingType){
+	public GlobalRegistry(LoadBalancingType loadBalancingType, ReplicationType replicationType){
 		this.loadBalancingType = loadBalancingType;
+		this.replicationType = replicationType;
 	}
 	
 	public static synchronized void main(String[] args) throws Exception {
@@ -42,8 +44,8 @@ public class GlobalRegistry implements IGlobalRegistry {
 	    System.out.println("Global registry: running on host " + InetAddress.getLocalHost());
 	    
 	    // create the registry on the local machine, on the default port number
-	    //LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.MINCPU);
-	    LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.ROUNDROBIN);
+	    //LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.MINCPU, ReplicationType.SEMI_ACTIVE);
+	    LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.ROUNDROBIN, ReplicationType.ACTIVE);
 	    System.out.println("Global registry: listening on port " + REGISTRY_PORT);
 
 	    // block forever
@@ -228,5 +230,14 @@ public class GlobalRegistry implements IGlobalRegistry {
 
 	public void setMaxIdByService(Map<String, Integer> maxIdByService) {
 		this.maxIdByService = maxIdByService;
+	}
+
+	@Override
+	public ReplicationType getReplicationType() {
+		return replicationType;
+	}
+
+	public void setReplicationType(ReplicationType replicationType) {
+		this.replicationType = replicationType;
 	}	
 }

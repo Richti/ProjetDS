@@ -31,7 +31,7 @@ public class SimpleSorterB implements Sorter {
 	public SimpleSorterB(String serviceName) throws RemoteException, NotBoundException{
 		String genericServiceName = serviceName.split("_")[0];
 		this.genericServiceName = genericServiceName;
-		this.serviceName = serviceName;
+		this.setServiceName(serviceName);
 		this.registry = (IGlobalRegistry) LocateGlobalRegistry.getLocateGlobalRegistry();
 	}
 	
@@ -82,8 +82,13 @@ public class SimpleSorterB implements Sorter {
 		return (Sorter) registry.getRemote(genericServiceName);
 	}
 
+	@Override
 	public String getServiceName() {
 		return serviceName;
+	}
+
+	public void setServiceName(String serviceName) {
+		this.serviceName = serviceName;
 	}
 
 }

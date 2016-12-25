@@ -15,4 +15,6 @@ public interface IGlobalRegistry extends Registry {
 	public Map<String, Remote> getPrimaryReplica() throws RemoteException;
 
 	public int getAndIncreaseMaxIdByService(String genericServiceName) throws RemoteException;
+
+	public ReplicationType getReplicationType() throws RemoteException;
 }

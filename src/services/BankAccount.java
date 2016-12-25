@@ -4,8 +4,9 @@ import java.lang.management.ManagementFactory;
 import java.rmi.NotBoundException;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
-import java.rmi.registry.Registry;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +16,7 @@ import message.Message;
 import message.MessageType;
 import registries.IGlobalRegistry;
 import registries.LocateGlobalRegistry;
+import registries.ReplicationType;
 
 public class BankAccount implements IBankAccount {
 	
@@ -31,31 +33,6 @@ public class BankAccount implements IBankAccount {
 		this.serviceName = serviceName;
 		setRegistry((IGlobalRegistry) LocateGlobalRegistry.getLocateGlobalRegistry());
 	}
-	
-	public static void main(String[] args) throws Exception {
-	    IBankAccount bank = new BankAccount("BankAccountA_ServerA");
-		try{
-			
-			Message msg1 = new Message(0, MessageType.DEPOSIT);
-			msg1.getArguments().add(10);
-			Message msg2 = new Message(1, MessageType.WITHDRAW);
-			msg2.getArguments().add(15);
-			Message msg3 = new Message(2, MessageType.DEPOSIT);
-			msg3.getArguments().add(10);
-			Message msg4 = new Message(3, MessageType.WITHDRAW);
-			msg4.getArguments().add(10);
-			
-			
-			bank.handleMessage(msg1);
-			bank.handleMessage(msg2);
-			bank.handleMessage(msg3);
-			bank.handleMessage(msg4);
-			System.out.println(bank.getBalance());
-		} catch (Exception e){
-			e.printStackTrace();
-		}
-
-	  }
 	
 	// Fonction de type consultation :
 	@Override
@@ -151,7 +128,22 @@ public class BankAccount implements IBankAccount {
 	}
 
 	private IBankAccount getCorrectBankAccount() throws RemoteException, NotBoundException{
-		return (IBankAccount) registry.getPrimaryReplica().get(genericServiceName);
+		// Si on fait de la réplication active, on doit effectuer un vote (on renvoie le service le plus à jour donc celui avec l'id attendu le plus haut):
+		if(registry.getReplicationType() == ReplicationType.ACTIVE){
+			Map<String, Remote> services = registry.getSpecificsServices(genericServiceName);
+			Map<Integer, IBankAccount> idExpectedByService = new HashMap<>();
+			for(Remote remote : services.values()) {
+				IBankAccount bankAccount = (IBankAccount) remote;
+				idExpectedByService.put(bankAccount.getIdExpected(), bankAccount);
+			}			
+			
+			int max = Collections.max(idExpectedByService.keySet());
+			return idExpectedByService.get(max);
+		}
+		// Sinon, on envoie la réponse du serveur primaire :
+		else {
+			return (IBankAccount) registry.getPrimaryReplica().get(genericServiceName);
+		}
 	}
 
 	@Override
@@ -183,6 +175,7 @@ public class BankAccount implements IBankAccount {
 		this.balance = balance;
 	}
 
+	@Override
 	public int getIdExpected() {
 		return idExpected;
 	}

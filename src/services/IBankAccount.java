@@ -23,5 +23,7 @@ public interface IBankAccount extends Service {
 
 	public void handleMessage(Message msg) throws RemoteException;
 
+	public int getIdExpected()throws RemoteException;
+
 	
 }

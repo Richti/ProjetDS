@@ -22,9 +22,9 @@ public class LocateGlobalRegistry {
 		return getLocateGlobalRegistry(LOCALHOST);
 	}
 	
-	public static Registry createGlobalRegistry(int port, LoadBalancingType loadServices) throws RemoteException, AlreadyBoundException, NotBoundException {
+	public static Registry createGlobalRegistry(int port, LoadBalancingType loadServices, ReplicationType replicationType) throws RemoteException, AlreadyBoundException, NotBoundException {
 		Registry r = LocateRegistry.createRegistry(port);
-		Registry stub = (Registry) UnicastRemoteObject.exportObject(new GlobalRegistry(loadServices), 0);
+		Registry stub = (Registry) UnicastRemoteObject.exportObject(new GlobalRegistry(loadServices, replicationType), 0);
 		r.bind(GLOBAL_REGISTRY, stub);
 		return stub;
 	}
