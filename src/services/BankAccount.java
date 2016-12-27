@@ -33,7 +33,7 @@ public class BankAccount implements IBankAccount {
 		this.serviceName = serviceName;
 		setRegistry((IGlobalRegistry) LocateGlobalRegistry.getLocateGlobalRegistry());
 	}
-	
+		
 	// Fonction de type consultation :
 	@Override
 	public String getBalance() throws RemoteException, NotBoundException {
@@ -48,12 +48,15 @@ public class BankAccount implements IBankAccount {
 
 	// Calcul et changement d'état
 	@Override
-	public void deposit(int money) throws RemoteException, NotBoundException {
-		int id = registry.getAndIncreaseMaxIdByService(genericServiceName);
-		
-		Message msg = new Message(id, MessageType.DEPOSIT);
-		msg.getArguments().add(money);	
-		notifyAll(msg);
+	public void deposit(int money) throws RemoteException, NotBoundException {	
+		if(registry.getReplicationType() != ReplicationType.PASSIVE){
+			int id = registry.getAndIncreaseMaxIdByService(genericServiceName);	
+			Message msg = new Message(id, MessageType.DEPOSIT);
+			msg.getArguments().add(money);
+			notifyAll(msg);
+		} else {
+			getCorrectBankAccount().effectiveDeposit(money);
+		}
 	}
 	
 	@Override
@@ -64,11 +67,15 @@ public class BankAccount implements IBankAccount {
  
 	// Calcul et changement d'état
 	@Override
-	public void withdraw(int money) throws RemoteException {
-		int id = registry.getAndIncreaseMaxIdByService(genericServiceName);
-		Message msg = new Message(id, MessageType.WITHDRAW);
-		msg.getArguments().add(money);
-		notifyAll(msg);
+	public void withdraw(int money) throws RemoteException, NotBoundException {	
+		if(registry.getReplicationType() != ReplicationType.PASSIVE){
+			int id = registry.getAndIncreaseMaxIdByService(genericServiceName);
+			Message msg = new Message(id, MessageType.WITHDRAW);
+			msg.getArguments().add(money);
+			notifyAll(msg);
+		} else {
+			getCorrectBankAccount().effectiveWithdraw(money);
+		}
 	}
 	
 	@Override
@@ -89,9 +96,13 @@ public class BankAccount implements IBankAccount {
 	
 	@Override
 	public void handleMessage(Message msg) throws RemoteException {
-		if(msg.getId() != idExpected){
+		System.out.println("id = " + msg.getId() + ", type = " + msg.getType());
+		if((msg.getId() != idExpected) && (msg.getType() != MessageType.UPDATE)){
 			messageQueue.add(msg);
-		} else {
+			return;
+		}
+		
+		try {
 			switch(msg.getType()){
 				case DEPOSIT:
 					int moneyToDepose = (Integer) msg.getArguments().get(0);
@@ -101,12 +112,20 @@ public class BankAccount implements IBankAccount {
 					int moneyToWithdraw = (Integer) msg.getArguments().get(0);
 					effectiveWithdraw(moneyToWithdraw);
 					break;
+				case UPDATE:
+					balance = (Integer) msg.getArguments().get(0);
+					System.out.println("Balance updated on " + serviceName + " : " + balance);
+					idExpected--;
+					break;
 				default:
 					break;
 			}
-			idExpected++;
-			checkMessageAlreadyArrived();
-		}
+		} catch(Exception e){
+			e.printStackTrace();
+		}	
+		
+		idExpected++;
+		checkMessageAlreadyArrived();	
 	}
 	
 	private void checkMessageAlreadyArrived() throws RemoteException {
@@ -124,6 +143,22 @@ public class BankAccount implements IBankAccount {
 		Map<String, Remote> services = registry.getSpecificsServices(genericServiceName);
 		for(Remote bankAccount : services.values()){
 			((IBankAccount) bankAccount).handleMessage(msg);
+		}
+	}
+	
+	private void notifyAllOthers(Message msg) throws RemoteException{
+		Map<String, Remote> services = registry.getSpecificsServices(genericServiceName);
+		services.remove(serviceName);
+		for(Remote bankAccount : services.values()){
+			((IBankAccount) bankAccount).handleMessage(msg);
+		}
+	}
+	
+	@Override
+	public void launchPeriodicUpdate() throws RemoteException{
+		if(registry.getReplicationType() == ReplicationType.PASSIVE){
+			Thread t = new PeriodicUpdate();
+			t.start();
 		}
 	}
 
@@ -190,6 +225,34 @@ public class BankAccount implements IBankAccount {
 
 	public void setMessageQueue(List<Message> messageQueue) {
 		this.messageQueue = messageQueue;
+	}
+	
+	
+	// Classe utilisée dans la réplication passive pour mettre à jour les services secondaires toutes les secondes
+	class PeriodicUpdate extends Thread {
+
+		@Override
+		public void run() {	
+			while(true){
+				int id = 0;
+				try {
+					Thread.sleep(3000);
+					id = registry.getAndIncreaseMaxIdByService(genericServiceName);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				
+				Message msg = new Message(id, MessageType.UPDATE);
+				msg.getArguments().add(balance);
+				synchronized(this){
+					try {
+						notifyAllOthers(msg);
+					} catch (RemoteException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}	
 	}
 	
 }

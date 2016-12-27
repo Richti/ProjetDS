@@ -45,7 +45,7 @@ public class GlobalRegistry implements IGlobalRegistry {
 	    
 	    // create the registry on the local machine, on the default port number
 	    //LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.MINCPU, ReplicationType.SEMI_ACTIVE);
-	    LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.ROUNDROBIN, ReplicationType.ACTIVE);
+	    LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.ROUNDROBIN, ReplicationType.PASSIVE);
 	    System.out.println("Global registry: listening on port " + REGISTRY_PORT);
 
 	    // block forever
@@ -64,6 +64,10 @@ public class GlobalRegistry implements IGlobalRegistry {
 			maxIdByService.put(genericServiceName, 0);
 			services.put(genericServiceName, new LinkedHashMap<>());
 			primaryReplica.put(genericServiceName, obj);
+			if(replicationType == ReplicationType.PASSIVE){
+				Service service = (Service) obj;
+				service.launchPeriodicUpdate();
+			}
 		}
 			
 		Map<String, Remote> servicesStored = services.get(genericServiceName);

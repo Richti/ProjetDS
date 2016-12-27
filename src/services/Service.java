@@ -8,4 +8,6 @@ public interface Service extends Remote {
 	public double getCPULoad() throws RemoteException;
 	
 	public String getServiceName() throws RemoteException;
+
+	public void launchPeriodicUpdate() throws RemoteException;
 }

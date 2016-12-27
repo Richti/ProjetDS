@@ -91,4 +91,9 @@ public class SimpleSorterB implements Sorter {
 		this.serviceName = serviceName;
 	}
 
+	@Override
+	public void launchPeriodicUpdate() throws RemoteException {
+		// Do nothing : stateless object doesn't need passive replication
+	}
+
 }

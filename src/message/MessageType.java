@@ -2,5 +2,6 @@ package message;
 
 public enum MessageType {
 	DEPOSIT,
-	WITHDRAW
+	WITHDRAW,
+	UPDATE
 }
