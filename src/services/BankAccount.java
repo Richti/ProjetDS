@@ -84,7 +84,7 @@ public class BankAccount implements IBankAccount {
 			System.out.println("Withdraw of " + money + " on " + serviceName+ "(balance before = " + balance + ")");
 			balance -= money;
 		}else {
-			System.out.println("Error when trying to withdraw" + money + " on " + serviceName + "(balance before = " + balance + ")");
+			System.out.println("Error when trying to withdraw " + money + " on " + serviceName + "(balance before = " + balance + ")");
 		}
 	}
 	
@@ -96,7 +96,6 @@ public class BankAccount implements IBankAccount {
 	
 	@Override
 	public void handleMessage(Message msg) throws RemoteException {
-		System.out.println("id = " + msg.getId() + ", type = " + msg.getType());
 		if((msg.getId() != idExpected) && (msg.getType() != MessageType.UPDATE)){
 			messageQueue.add(msg);
 			return;
@@ -157,7 +156,7 @@ public class BankAccount implements IBankAccount {
 	@Override
 	public void launchPeriodicUpdate() throws RemoteException{
 		if(registry.getReplicationType() == ReplicationType.PASSIVE){
-			Thread t = new PeriodicUpdate();
+			Thread t = new PeriodicUpdate(3);
 			t.start();
 		}
 	}
@@ -227,16 +226,25 @@ public class BankAccount implements IBankAccount {
 		this.messageQueue = messageQueue;
 	}
 	
-	
-	// Classe utilisée dans la réplication passive pour mettre à jour les services secondaires toutes les secondes
+	/*
+	 * 	Classe utilisée dans la réplication passive pour mettre à jour les services secondaires toutes les nbSecond secondes
+	 */
 	class PeriodicUpdate extends Thread {
+		
+		private int nbSecond = 1;
+		
+		public PeriodicUpdate(int nbSecond) {
+			if(nbSecond > 1){
+				this.nbSecond = nbSecond;
+			}
+		}
 
 		@Override
 		public void run() {	
 			while(true){
 				int id = 0;
 				try {
-					Thread.sleep(3000);
+					Thread.sleep(nbSecond * 1000);
 					id = registry.getAndIncreaseMaxIdByService(genericServiceName);
 				} catch (Exception e) {
 					e.printStackTrace();

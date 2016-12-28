@@ -1,7 +1,6 @@
 package registries;
 
 public enum LoadBalancingType {
-
-	ROUNDROBIN, MINCPU
-	
+	ROUNDROBIN, 
+	MINCPU
 }

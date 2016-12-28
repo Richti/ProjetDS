@@ -6,6 +6,9 @@ import java.rmi.RemoteException;
 import java.rmi.registry.Registry;
 import java.util.Map;
 
+/*
+ *  This interface is used in services to perform load balancing and replication (not needed in client)
+ */
 public interface IGlobalRegistry extends Registry {
 	
 	public Remote getRemote(String name) throws RemoteException, NotBoundException;

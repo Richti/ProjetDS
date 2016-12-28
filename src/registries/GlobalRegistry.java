@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import services.Service;
-import services.Sorter;
 
 public class GlobalRegistry implements IGlobalRegistry {
 	
@@ -44,8 +43,8 @@ public class GlobalRegistry implements IGlobalRegistry {
 	    System.out.println("Global registry: running on host " + InetAddress.getLocalHost());
 	    
 	    // create the registry on the local machine, on the default port number
-	    //LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.MINCPU, ReplicationType.SEMI_ACTIVE);
-	    LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.ROUNDROBIN, ReplicationType.PASSIVE);
+	    // You need to change this line to test different Load balancing type and replication type (all configurations have been tested)
+	    LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.MINCPU, ReplicationType.SEMI_ACTIVE);
 	    System.out.println("Global registry: listening on port " + REGISTRY_PORT);
 
 	    // block forever
@@ -64,6 +63,7 @@ public class GlobalRegistry implements IGlobalRegistry {
 			maxIdByService.put(genericServiceName, 0);
 			services.put(genericServiceName, new LinkedHashMap<>());
 			primaryReplica.put(genericServiceName, obj);
+			// Si on fait de la réplication passive alors on lance un thread sur le service principal pour mettre à jour les services secondaires
 			if(replicationType == ReplicationType.PASSIVE){
 				Service service = (Service) obj;
 				service.launchPeriodicUpdate();
@@ -72,13 +72,12 @@ public class GlobalRegistry implements IGlobalRegistry {
 			
 		Map<String, Remote> servicesStored = services.get(genericServiceName);
 		if(servicesStored.containsKey(name)){
-			System.out.println("bind : AlreadyBoundException in bind method");
 			throw new AlreadyBoundException(name);
 		}
 		
 		servicesStored.put(name, obj);
 		services.put(genericServiceName, servicesStored);
-		System.out.println("bind succed : " + name + " - " + genericServiceName);
+		System.out.println("bind succeed : " + name + " - " + genericServiceName);
 	}
 
 	@Override
@@ -109,8 +108,9 @@ public class GlobalRegistry implements IGlobalRegistry {
 			primaryReplica.put(genericServiceName, obj);
 		}
 		
-		services.get(genericServiceName).remove(name);
-		
+		// Little bug here : the remove doesnt't work : need to implements an id for each object?
+		while (services.get(genericServiceName).values().remove(obj));
+
 		try {
 			bind(name, obj);
 		} catch (AlreadyBoundException e) {
@@ -136,6 +136,7 @@ public class GlobalRegistry implements IGlobalRegistry {
 					primaryReplica.put(genericServiceName, remote);
 				}
 			}
+			System.out.println("Unbind succeed : " + name + " - " + genericServiceName);
 		}
 	}
 	
@@ -170,20 +171,16 @@ public class GlobalRegistry implements IGlobalRegistry {
 		
 		for(int i = 0 ; i < size; i++){
 			Service a = (Service) services.get(genericServiceName).values().toArray()[i];
-			String name = (String) services.get(genericServiceName).keySet().toArray()[i];
-			listServicesTime.put(a.getCPULoad(), a);
-			System.out.println("Service name : " + name + " CPULoad : "+ a.getCPULoad());
+			listServicesTime.put(a.getCPULoad(), a);		
 		}
 		
 		Double min = Collections.min(listServicesTime.keySet());
-		System.out.println(" -> Le minimum pour " + genericServiceName + " est " + min);
 		return listServicesTime.get(min);
 	}
 	
 	private Remote getServiceRoundRobin(String name){
 		int i = currentServiceIndex.get(name);
 		currentServiceIndex.replace(name, getNewServiceIndex(name));
-		System.out.println((String) services.get(name).keySet().toArray()[i]);
 		return (Remote) services.get(name).values().toArray()[i];
 	}
 	
@@ -196,33 +193,12 @@ public class GlobalRegistry implements IGlobalRegistry {
 		} else {
 			index++;
 		}
-		System.out.println("index of " + name + " is now : " + index);
 		return index;
-	}
-	
-	public Map<String, Map<String, Remote>> getServices() {
-		return services;
-	}
-
-	public void setServices(Map<String, Map<String, Remote>> services) {
-		this.services = services;
-	}
-
-	public Map<String, Integer> getCurrentServiceIndex() {
-		return currentServiceIndex;
-	}
-
-	public void setCurrentServiceIndex(Map<String, Integer> currentServiceIndex) {
-		this.currentServiceIndex = currentServiceIndex;
 	}
 
 	@Override
 	public Map<String, Remote> getPrimaryReplica() throws RemoteException {
 		return primaryReplica;
-	}
-
-	public Map<String, Integer> getMaxIdByService() {
-		return maxIdByService;
 	}
 	
 	@Override
@@ -232,16 +208,8 @@ public class GlobalRegistry implements IGlobalRegistry {
 		return result;
 	}
 
-	public void setMaxIdByService(Map<String, Integer> maxIdByService) {
-		this.maxIdByService = maxIdByService;
-	}
-
 	@Override
 	public ReplicationType getReplicationType() {
 		return replicationType;
-	}
-
-	public void setReplicationType(ReplicationType replicationType) {
-		this.replicationType = replicationType;
 	}	
 }

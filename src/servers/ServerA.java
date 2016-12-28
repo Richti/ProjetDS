@@ -6,6 +6,8 @@ import java.rmi.server.UnicastRemoteObject;
 import registries.LocateGlobalRegistry;
 import services.BankAccount;
 import services.IBankAccount;
+import services.SimpleSorter;
+import services.Sorter;
 
 /**
  * Server program.
@@ -24,7 +26,7 @@ public class ServerA {
   private static final String SERVICE_NAME2 = "SimpleSorterB_ServerA";
   
   private static final String SERVICE_NAME3 = "BankAccountA_ServerA";
-  private static final String SERVICE_NAME4 = "BankAcountB_ServerA";
+  private static final String SERVICE_NAME4 = "BankAccountB_ServerA";
 
   //
   // MAIN
@@ -35,30 +37,34 @@ public class ServerA {
     System.out.println("ServerA: running on host " + InetAddress.getLocalHost());
     System.out.println("ServerA: hostname property " + System.getProperty("java.rmi.server.hostname"));
 
-//    // instanciate the remote object
-//    Sorter sorterA = new SimpleSorterA();
-//    Sorter sorterB = new SimpleSorterB();
-//    System.out.println("ServerA: instanciated SimpleSorter");
-//
-//    // create a skeleton and a stub for that remote object
-//    Sorter stubA = (Sorter) UnicastRemoteObject.exportObject(sorterA, 0);
-//    Sorter stubB = (Sorter) UnicastRemoteObject.exportObject(sorterB, 0);
-//    System.out.println("ServerA: generated skeleton and stub");
-//
-//    // register the remote object's stub in the registry
-//	LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME1, stubA);
-//    LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME2, stubB);
+    // instanciate the remote object
+    Sorter sorterA = new SimpleSorter(SERVICE_NAME1);
+    Sorter sorterB = new SimpleSorter(SERVICE_NAME2);
+    System.out.println("ServerA: instanciated SimpleSorter A and B.");
+
+    // create a skeleton and a stub for that remote object
+    Sorter stubA = (Sorter) UnicastRemoteObject.exportObject(sorterA, 0);
+    Sorter stubB = (Sorter) UnicastRemoteObject.exportObject(sorterB, 0);
+    System.out.println("ServerA: generated skeletons and stubs");
+
+    // register the remote object's stub in the registry
+	LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME1, stubA);
+    LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME2, stubB);
     
     // instanciate the remote object
     IBankAccount bankA = new BankAccount(SERVICE_NAME3);
-    System.out.println("ServerA: instanciated SimpleSorter");
+    IBankAccount bankB = new BankAccount(SERVICE_NAME4);
+    System.out.println("ServerA: instanciated BankAccount A and B.");
 
     // create a skeleton and a stub for that remote object
-    IBankAccount stubA = (IBankAccount) UnicastRemoteObject.exportObject(bankA, 0);
+    IBankAccount stubBankA = (IBankAccount) UnicastRemoteObject.exportObject(bankA, 0);
+    IBankAccount stubBankB = (IBankAccount) UnicastRemoteObject.exportObject(bankB, 0);
     System.out.println("ServerA: generated skeleton and stub");
 
     // register the remote object's stub in the registry
-	LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME3, stubA);    
+	LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME3, stubBankA); 
+	LocateGlobalRegistry.getLocateGlobalRegistry().bind(SERVICE_NAME4, stubBankB);    
+
 
     // main terminates here, but the JVM still runs because of the skeleton
     System.out.println("ServerA: ready");

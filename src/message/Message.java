@@ -4,12 +4,18 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+/*
+ * This class is used to make services talks to each others (in order to perform stateful replication)
+ */
 public class Message implements Serializable{
 	
 	private static final long serialVersionUID = -4995401686087165352L;
 	
 	private int id;
 	private MessageType type;
+	/*
+	 * The arguments list represents the content of the message
+	 */
 	private List<Object> arguments = new ArrayList<Object>();
 	
 	public Message(int id, MessageType type){
