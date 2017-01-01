@@ -1,0 +1,212 @@
+package framework.registries;
+
+import java.net.InetAddress;
+import java.rmi.AccessException;
+import java.rmi.AlreadyBoundException;
+import java.rmi.NotBoundException;
+import java.rmi.Remote;
+import java.rmi.RemoteException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+public class GlobalRegistry implements IGlobalRegistry {
+	
+	private static final int REGISTRY_PORT = 1099;
+	
+	private LoadBalancingType loadBalancingType;
+	private ReplicationType replicationType;
+	private Map<String, Map<String, Remote>> services = new HashMap<>();
+	
+	// Used in passive and semi-active replication
+	private Map<String, Remote> primaryReplica = new HashMap<>();
+	
+	// Used to implement fifo ordering between methods calls (key : genericServiceName and value : id du dernier message à recevoir)
+	private Map<String, Integer> maxIdByService = new HashMap<>();
+	
+	//Use to perform RoundRobin load balancing
+	private Map<String, Integer> currentServiceIndex = new HashMap<>();
+	  
+	public GlobalRegistry(LoadBalancingType loadBalancingType, ReplicationType replicationType){
+		this.loadBalancingType = loadBalancingType;
+		this.replicationType = replicationType;
+	}
+	
+	public static synchronized void main(String[] args) throws Exception {
+		
+	    System.out.println("Global registry: running on host " + InetAddress.getLocalHost());
+	    
+	    // create the registry on the local machine, on the default port number
+	    // You need to change this line to test different Load balancing type and replication type (all configurations have been tested)
+	    LocateGlobalRegistry.createGlobalRegistry(REGISTRY_PORT, LoadBalancingType.ROUNDROBIN, ReplicationType.PASSIVE);
+	    System.out.println("Global registry: listening on port " + REGISTRY_PORT);
+
+	    // block forever
+	    GlobalRegistry.class.wait();
+	    System.out.println("Global registry: exiting (should not happen)");
+	  }
+	
+	
+	
+	@Override
+	public void bind(String name, Remote obj) throws RemoteException, AlreadyBoundException, AccessException {
+		String genericServiceName = name.split("_")[0];
+		
+		if(!services.containsKey(genericServiceName)){
+			currentServiceIndex.put(genericServiceName, 0);
+			maxIdByService.put(genericServiceName, 0);
+			services.put(genericServiceName, new LinkedHashMap<>());
+			primaryReplica.put(genericServiceName, obj);
+			// Si on fait de la réplication passive alors on lance un thread sur le service principal pour mettre à jour les services secondaires
+			if(replicationType == ReplicationType.PASSIVE){
+				Service service = (Service) obj;
+				service.launchPeriodicUpdate();
+			}
+		}
+			
+		Map<String, Remote> servicesStored = services.get(genericServiceName);
+		if(servicesStored.containsKey(name)){
+			throw new AlreadyBoundException(name);
+		}
+		
+		servicesStored.put(name, obj);
+		services.put(genericServiceName, servicesStored);
+		((Service) obj).setServiceName(name);
+		System.out.println("bind succeed : " + name + " - " + genericServiceName);
+	}
+
+	@Override
+	public String[] list() throws RemoteException, AccessException {
+		String[] names = services.keySet().toArray(new String[services.keySet().size()]);
+		List<String> result = new ArrayList<>();
+		for(String name : names){
+			Map<String, Remote> servicesStored = services.get(name);
+			for(String serviceName : servicesStored.keySet()){
+				result.add(serviceName);
+			}
+		}
+		return (String[]) result.toArray(new String[result.size()]);
+	}
+
+	@Override
+	public Remote lookup(String name) throws RemoteException, NotBoundException, AccessException {
+		return getRemote(name);
+	}
+
+	@Override
+	public void rebind(String name, Remote obj) throws RemoteException, AccessException {
+		Service sObj = (Service) obj;
+		String oldGenericServiceName = sObj.getServiceName().split("_")[0];
+		
+		if(services.get(oldGenericServiceName) != null){
+			services.get(oldGenericServiceName).values().remove(obj);
+		}
+		
+		try {
+			bind(name, obj);
+		} catch (AlreadyBoundException e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void unbind(String name) throws RemoteException, NotBoundException, AccessException {
+		String genericServiceName = name.split("_")[0];
+		
+		if(services.containsKey(genericServiceName)){
+			services.get(genericServiceName).remove(name);
+			currentServiceIndex.replace(genericServiceName, getNewServiceIndex(genericServiceName));
+			Service service = (Service) primaryReplica.get(genericServiceName);
+			// Si le service est une replique primaire alors on le retire de la liste
+			if(service.getServiceName().equals(name)){
+				primaryReplica.remove(service);
+				Iterator<Entry<String, Remote>> i = services.get(genericServiceName).entrySet().iterator();
+				// Et si il y a d'autres répliques on ajoute une nouvelle réplique primaire
+				if(i.hasNext()){
+					Remote remote = i.next().getValue();
+					primaryReplica.put(genericServiceName, remote);
+				}
+			}
+			System.out.println("Unbind succeed : " + name + " - " + genericServiceName);
+		}
+	}
+	
+	@Override
+	public Remote getRemote(String name) throws RemoteException, NotBoundException{
+		if(services.containsKey(name)){
+			switch(loadBalancingType){
+				case MINCPU:
+					return getMinCPUForAService(name);
+				case ROUNDROBIN:
+					return getServiceRoundRobin(name);
+				default:
+					return null;
+			}		
+		} else {
+			throw new NotBoundException(name);
+		}
+	}
+	
+	@Override
+	public Map<String, Remote> getSpecificsServices(String genericName){
+		if(!services.containsKey(genericName)){
+			return null;
+		} else{
+			return services.get(genericName);
+		}
+	}
+	
+	private Remote getMinCPUForAService(String genericServiceName) throws RemoteException{
+		int size = services.get(genericServiceName).size();
+		Map<Double, Service> listServicesTime = new HashMap<>();
+		
+		for(int i = 0 ; i < size; i++){
+			Service a = (Service) services.get(genericServiceName).values().toArray()[i];
+			listServicesTime.put(a.getCPULoad(), a);		
+		}
+		
+		Double min = Collections.min(listServicesTime.keySet());
+		return listServicesTime.get(min);
+	}
+	
+	private Remote getServiceRoundRobin(String name){
+		int i = currentServiceIndex.get(name);
+		currentServiceIndex.replace(name, getNewServiceIndex(name));
+		return (Remote) services.get(name).values().toArray()[i];
+	}
+	
+	private int getNewServiceIndex(String name){
+		int index = currentServiceIndex.get(name);
+		int nbReplicatedServices = services.get(name).size();
+		
+		if(index >= nbReplicatedServices - 1){
+			index = 0;
+		} else {
+			index++;
+		}
+		return index;
+	}
+
+	@Override
+	public Map<String, Remote> getPrimaryReplica() throws RemoteException {
+		return primaryReplica;
+	}
+	
+	@Override
+	public int getAndIncreaseMaxIdByService(String genericServiceName) throws RemoteException {
+		int result = maxIdByService.get(genericServiceName);
+		maxIdByService.replace(genericServiceName, result + 1);
+		return result;
+	}
+
+	@Override
+	public ReplicationType getReplicationType() {
+		return replicationType;
+	}
+	
+}

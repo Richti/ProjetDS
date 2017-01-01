@@ -1,9 +1,9 @@
-package services;
+package application.services;
 
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 
-import message.Message;
+import framework.registries.Service;
 
 public interface IBankAccount extends Service {
 	
@@ -11,12 +11,6 @@ public interface IBankAccount extends Service {
 	public void deposit(int money)throws RemoteException, NotBoundException;
 	public void withdraw(int money)throws RemoteException, NotBoundException;
 	
-	public String effectiveGetBalance() throws RemoteException;
-	public void effectiveDeposit(int money) throws RemoteException;
-	public void effectiveWithdraw(int money) throws RemoteException;
-	
-	public String getServiceName() throws RemoteException;
-	public void handleMessage(Message msg) throws RemoteException;
 	public int getIdExpected()throws RemoteException;
 	
 }

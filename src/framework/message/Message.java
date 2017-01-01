@@ -1,4 +1,4 @@
-package message;
+package framework.message;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -11,22 +11,26 @@ public class Message implements Serializable{
 	
 	private static final long serialVersionUID = -4995401686087165352L;
 	
-	private int id;
+	private int id = -1;
 	private MessageType type;
 	/*
-	 * The arguments list represents the content of the message
+	 * The data list represents the content of the message
 	 */
-	private List<Object> arguments = new ArrayList<Object>();
+	private List<Object> data = new ArrayList<Object>();
 	
 	public Message(int id, MessageType type){
-		this.id = id;
+		this(type);
+		this.id = id;	
+	}
+	
+	public Message(MessageType type){
 		this.type = type;
 	}
 	
 	public Message(int id, MessageType type, List<Object> arguments){
 		this.id = id;
 		this.type = type;
-		this.arguments = arguments;
+		this.data = arguments;
 	}
 	
 	public int getId() {
@@ -46,11 +50,11 @@ public class Message implements Serializable{
 	}
 
 	public List<Object> getArguments() {
-		return arguments;
+		return data;
 	}
 
 	public void setArguments(List<Object> arguments) {
-		this.arguments = arguments;
+		this.data = arguments;
 	}
 	
 }

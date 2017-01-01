@@ -1,4 +1,4 @@
-package services;
+package application.services;
 
 import java.lang.management.ManagementFactory;
 import java.rmi.NotBoundException;
@@ -12,55 +12,50 @@ import java.util.Map;
 
 import com.sun.management.OperatingSystemMXBean;
 
-import message.Message;
-import message.MessageType;
-import registries.IGlobalRegistry;
-import registries.LocateGlobalRegistry;
-import registries.ReplicationType;
+import framework.message.Message;
+import framework.message.MessageType;
+import framework.registries.IGlobalRegistry;
+import framework.registries.LocateGlobalRegistry;
+import framework.registries.ReplicationType;
+import framework.registries.Service;
 
 public class BankAccount implements IBankAccount {
 	
-	private String genericServiceName;
-	private String serviceName;
+	private String genericServiceName = "";
+	private String serviceName = "";
 	private IGlobalRegistry registry;
 	private int balance = 0;
 	private int idExpected = 0;
 	private List<Message> messageQueue = new ArrayList<>();
 	
-	public BankAccount(String serviceName) throws RemoteException, NotBoundException{
-		String genericServiceName = serviceName.split("_")[0];
-		this.genericServiceName = genericServiceName;
-		this.serviceName = serviceName;
+	public BankAccount() throws RemoteException, NotBoundException{
 		setRegistry((IGlobalRegistry) LocateGlobalRegistry.getLocateGlobalRegistry());
 	}
 		
 	// Fonction de type consultation :
 	@Override
 	public String getBalance() throws RemoteException, NotBoundException {
-		return getCorrectBankAccount().effectiveGetBalance();
+		Message msg = new Message(MessageType.GET_BALANCE);
+		Message response = getCorrectBankAccount().handleMessage(msg);
+		return (String) response.getArguments().get(0);
 	}
 	
-	@Override
-	public String effectiveGetBalance() throws RemoteException {
+	private String effectiveGetBalance() throws RemoteException {
 		System.out.println("Account balance on " + serviceName + " is " + balance);
 		return  "Your account balance is " + balance + " from service : " + serviceName;
 	}
 
 	// Calcul et changement d'état
 	@Override
-	public void deposit(int money) throws RemoteException, NotBoundException {	
-		if(registry.getReplicationType() != ReplicationType.PASSIVE){
-			int id = registry.getAndIncreaseMaxIdByService(genericServiceName);	
-			Message msg = new Message(id, MessageType.DEPOSIT);
-			msg.getArguments().add(money);
-			notifyAll(msg);
-		} else {
-			getCorrectBankAccount().effectiveDeposit(money);
-		}
+	public void deposit(int money) throws RemoteException, NotBoundException {
+		int id = registry.getAndIncreaseMaxIdByService(genericServiceName);	
+		Message msg = new Message(id, MessageType.DEPOSIT);
+		msg.getArguments().add(money);
+		
+		sendToAllIfNeeded(msg);
 	}
 	
-	@Override
-	public void effectiveDeposit(int money) throws RemoteException {
+	private void effectiveDeposit(int money) throws RemoteException {
 		System.out.println("Deposit of " + money + " on " + serviceName + "(balance before = " + balance + ")");
 		balance += money;
 	}
@@ -68,23 +63,27 @@ public class BankAccount implements IBankAccount {
 	// Calcul et changement d'état
 	@Override
 	public void withdraw(int money) throws RemoteException, NotBoundException {	
-		if(registry.getReplicationType() != ReplicationType.PASSIVE){
-			int id = registry.getAndIncreaseMaxIdByService(genericServiceName);
-			Message msg = new Message(id, MessageType.WITHDRAW);
-			msg.getArguments().add(money);
-			notifyAll(msg);
-		} else {
-			getCorrectBankAccount().effectiveWithdraw(money);
-		}
+		int id = registry.getAndIncreaseMaxIdByService(genericServiceName);
+		Message msg = new Message(id, MessageType.WITHDRAW);
+		msg.getArguments().add(money);
+		
+		sendToAllIfNeeded(msg);
 	}
 	
-	@Override
-	public void effectiveWithdraw(int money) {
+	private void effectiveWithdraw(int money) {
 		if(balance >= money){
 			System.out.println("Withdraw of " + money + " on " + serviceName+ "(balance before = " + balance + ")");
 			balance -= money;
 		}else {
 			System.out.println("Error when trying to withdraw " + money + " on " + serviceName + "(balance before = " + balance + ")");
+		}
+	}
+	
+	private void sendToAllIfNeeded(Message msg) throws RemoteException, NotBoundException{
+		if(registry.getReplicationType() == ReplicationType.PASSIVE){
+			getCorrectBankAccount().handleMessage(msg);
+		} else {
+			notifyAll(msg);
 		}
 	}
 	
@@ -95,14 +94,20 @@ public class BankAccount implements IBankAccount {
 	}
 	
 	@Override
-	public void handleMessage(Message msg) throws RemoteException {
-		if((msg.getId() != idExpected) && (msg.getType() != MessageType.UPDATE)){
+	public Message handleMessage(Message msg) throws RemoteException {
+		Message response = new Message(MessageType.RESPONSE);
+		// Si l'id n'est pas celui attendu : (sachant qu'un id égal à -1 signifie que le message n'est pas inclus dans l'ordre fifo)
+		if((msg.getId() != idExpected) && (msg.getId() != -1)){
 			messageQueue.add(msg);
-			return;
+			return null;
 		}
 		
 		try {
 			switch(msg.getType()){
+				case GET_BALANCE:
+					response.getArguments().add(effectiveGetBalance());
+					idExpected--;
+				break;
 				case DEPOSIT:
 					int moneyToDepose = (Integer) msg.getArguments().get(0);
 					effectiveDeposit(moneyToDepose);
@@ -124,7 +129,8 @@ public class BankAccount implements IBankAccount {
 		}	
 		
 		idExpected++;
-		checkMessageAlreadyArrived();	
+		checkMessageAlreadyArrived();
+		return response;
 	}
 	
 	private void checkMessageAlreadyArrived() throws RemoteException {
@@ -138,10 +144,10 @@ public class BankAccount implements IBankAccount {
     	}
 	}
 	
-	private void notifyAll(Message msg) throws RemoteException{
+	private void notifyAll(Message msg) throws RemoteException {
 		Map<String, Remote> services = registry.getSpecificsServices(genericServiceName);
 		for(Remote bankAccount : services.values()){
-			((IBankAccount) bankAccount).handleMessage(msg);
+			((Service) bankAccount).handleMessage(msg);
 		}
 	}
 	
@@ -149,16 +155,14 @@ public class BankAccount implements IBankAccount {
 		Map<String, Remote> services = registry.getSpecificsServices(genericServiceName);
 		services.remove(serviceName);
 		for(Remote bankAccount : services.values()){
-			((IBankAccount) bankAccount).handleMessage(msg);
+			((Service) bankAccount).handleMessage(msg);
 		}
 	}
 	
 	@Override
 	public void launchPeriodicUpdate() throws RemoteException{
-		if(registry.getReplicationType() == ReplicationType.PASSIVE){
-			Thread t = new PeriodicUpdate(3);
-			t.start();
-		}
+		Thread t = new PeriodicUpdate(3);
+		t.start();
 	}
 
 	private IBankAccount getCorrectBankAccount() throws RemoteException, NotBoundException{
@@ -185,7 +189,9 @@ public class BankAccount implements IBankAccount {
 		return serviceName;
 	}
 
+	@Override
 	public void setServiceName(String serviceName) {
+		this.genericServiceName = serviceName.split("_")[0];
 		this.serviceName = serviceName;
 	}
 
@@ -242,15 +248,13 @@ public class BankAccount implements IBankAccount {
 		@Override
 		public void run() {	
 			while(true){
-				int id = 0;
 				try {
 					Thread.sleep(nbSecond * 1000);
-					id = registry.getAndIncreaseMaxIdByService(genericServiceName);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
 				
-				Message msg = new Message(id, MessageType.UPDATE);
+				Message msg = new Message(MessageType.UPDATE);
 				msg.getArguments().add(balance);
 				synchronized(this){
 					try {

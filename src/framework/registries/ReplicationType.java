@@ -1,4 +1,4 @@
-package registries;
+package framework.registries;
 
 public enum ReplicationType {
 	ACTIVE,

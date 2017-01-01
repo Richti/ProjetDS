@@ -1,12 +1,12 @@
-package clients;
+package application.clients;
 
 import java.rmi.registry.Registry;
 import java.util.Arrays;
 import java.util.List;
 
-import registries.LocateGlobalRegistry;
-import services.IBankAccount;
-import services.Sorter;
+import application.services.IBankAccount;
+import application.services.Sorter;
+import framework.registries.LocateGlobalRegistry;
 
 public class ClientB {
 

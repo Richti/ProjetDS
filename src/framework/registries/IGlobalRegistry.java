@@ -1,4 +1,4 @@
-package registries;
+package framework.registries;
 
 import java.rmi.NotBoundException;
 import java.rmi.Remote;
